@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>enter</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; background: #000; }
+    canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+    .center { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; }
+    a {
+      color: #fff;
+      text-decoration: none;
+      font-family: 'Courier New', monospace;
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      border: 1px solid #2E2EFF;
+      padding: 0.45em 1.2em;
+      display: inline-block;
+      transition: background 0.25s, color 0.25s, border-color 0.25s, box-shadow 0.25s;
+    }
+    a:hover {
+      background: #2E2EFF;
+      border-color: #2E2EFF;
+      color: #fff;
+      box-shadow: 0 0 30px rgba(46,46,255,0.5);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="center">
+    <a href="https://dev.ucoz.org/">enter</a>
+  </div>
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+
+    const NUM_STARS = 333;
+    const SPEED = 2.5;
+    const MAX_DEPTH = 1000;
+    const PARALLAX_STRENGTH = 0.4;
+
+    let W, H, cx, cy;
+    let stars = [];
+    let mx = 0, my = 0;
+    let vpx = 0, vpy = 0;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      cx = W / 2;
+      cy = H / 2;
+    }
+
+    function randomStar() {
+      return {
+        x: (Math.random() - 0.5) * W * 2,
+        y: (Math.random() - 0.5) * H * 2,
+        z: Math.random() * MAX_DEPTH,
+        pz: 0
+      };
+    }
+
+    function init() {
+      stars = [];
+      for (let i = 0; i < NUM_STARS; i++) {
+        const s = randomStar();
+        s.pz = s.z;
+        stars.push(s);
+      }
+    }
+
+    function project(x, y, z, ox, oy) {
+      const fov = W * 0.5;
+      const scale = fov / z;
+      return { sx: cx + ox + x * scale, sy: cy + oy + y * scale, scale };
+    }
+
+    function draw() {
+      vpx += (mx * W * PARALLAX_STRENGTH - vpx) * 0.06;
+      vpy += (my * H * PARALLAX_STRENGTH - vpy) * 0.06;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(0, 0, W, H);
+
+      for (let i = 0; i < NUM_STARS; i++) {
+        const s = stars[i];
+        const prev = project(s.x, s.y, s.pz, vpx, vpy);
+        s.pz = s.z;
+        s.z -= SPEED;
+
+        if (s.z <= 1) {
+          stars[i] = randomStar();
+          stars[i].z = stars[i].pz = MAX_DEPTH;
+          continue;
+        }
+
+        const curr = project(s.x, s.y, s.z, vpx, vpy);
+
+        if (curr.sx < 0 || curr.sx > W || curr.sy < 0 || curr.sy > H) {
+          if (prev.sx < 0 || prev.sx > W || prev.sy < 0 || prev.sy > H) {
+            stars[i] = randomStar();
+            stars[i].z = stars[i].pz = MAX_DEPTH;
+          }
+          continue;
+        }
+
+        const size = Math.max(0.1, curr.scale * 0.5);
+        const alpha = Math.min(1, (MAX_DEPTH - s.z) / MAX_DEPTH * 3 + 0.1);
+
+        ctx.beginPath();
+        ctx.moveTo(prev.sx, prev.sy);
+        ctx.lineTo(curr.sx, curr.sy);
+        ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.8})`;
+        ctx.lineWidth = size;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(curr.sx, curr.sy, size * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.fill();
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('mousemove', e => {
+      mx = (e.clientX - W / 2) / (W / 2);
+      my = (e.clientY - H / 2) / (H / 2);
+    });
+
+    window.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const t = e.touches[0];
+      mx = (t.clientX - W / 2) / (W / 2);
+      my = (t.clientY - H / 2) / (H / 2);
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => { mx = 0; my = 0; });
+    window.addEventListener('resize', () => { resize(); init(); });
+
+    resize();
+    init();
+    draw();
+  </script>
+</body>
+</html>
